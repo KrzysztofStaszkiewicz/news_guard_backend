@@ -1,9 +1,10 @@
 import os
+import json
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from openai import OpenAI
-import json
+import httpx
 
 app = FastAPI()
 
@@ -14,20 +15,23 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Pobieramy token ze zmiennej środowiskowej serwera
+# Token pobierzemy ze zmiennych środowiskowych Vercela
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 
-# Zabezpieczenie na przypadek, gdyby zmienna nie została ustawiona
-if not GITHUB_TOKEN:
-    raise RuntimeError("Brak zmiennej środowiskowej GITHUB_TOKEN!")
+http_client = httpx.Client(verify=False, trust_env=False)
 
 client = OpenAI(
     base_url="https://models.inference.ai.azure.com",
-    api_key=GITHUB_TOKEN
+    api_key=GITHUB_TOKEN,
+    http_client=http_client
 )
 
 class HeadlineInput(BaseModel):
     title: str
+
+@app.get("/")
+def read_root():
+    return {"status": "News Guard API dziala na Vercel!"}
 
 @app.post("/analyze")
 async def analyze_headline(input_data: HeadlineInput):
