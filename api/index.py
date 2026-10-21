@@ -1,5 +1,6 @@
 import os
 import json
+from typing import List
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -15,7 +16,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Token pobierzemy ze zmiennych środowiskowych Vercela
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 
 http_client = httpx.Client(verify=False, trust_env=False)
@@ -26,28 +26,33 @@ client = OpenAI(
     http_client=http_client
 )
 
-class HeadlineInput(BaseModel):
-    title: str
+# Model przyjmowania danych – teraz akceptujemy listę napisów
+class HeadlineBatchInput(BaseModel):
+    titles: List[str]
 
 @app.get("/")
 def read_root():
-    return {"status": "News Guard API dziala na Vercel!"}
+    return {"status": "News Guard API na Vercel dziala!"}
 
-@app.post("/analyze")
-async def analyze_headline(input_data: HeadlineInput):
+@app.post("/analyze-batch")
+async def analyze_batch(input_data: HeadlineBatchInput):
     try:
+        # Tworzymy numerowaną listę nagłówków dla modelu AI
+        formatted_titles = "\n".join([f"{idx + 1}. {title}" for idx, title in enumerate(input_data.titles)])
+
+        system_prompt = (
+            "Jesteś analitykiem NLP. Przeanalizuj poniższą listę nagłówków prasowych. "
+            "Dla każdego nagłówka określ poziom clickbaitu (0-100%) oraz ładunek emocjonalny (1-10). "
+            "Zwróć WYŁĄCZNIE czysty obiekt JSON z kluczem 'results', zawierającym tablicę obiektów. "
+            "Przykład formatu: {\"results\": [{\"id\": 1, \"clickbait\": 85, \"emotion\": 7}, {\"id\": 2, \"clickbait\": 10, \"emotion\": 2]}"
+        )
+
         chat_completion = client.chat.completions.create(
             messages=[
-                {
-                    "role": "system",
-                    "content": "Jesteś analitykiem NLP. Przeanalizuj nagłówek pod kątem clickbaitu (0-100%) i ładunku emocjonalnego (1-10). Odpowiedz WYŁĄCZNIE czystym JSONem w formacie: {\"clickbait\": int, \"emotion\": int}"
-                },
-                {
-                    "role": "user",
-                    "content": input_data.title
-                }
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": formatted_titles}
             ],
-            model="Meta-Llama-3-8B-Instruct",
+            model="Meta-Llama-3.1-8B-Instruct", # Nowszy model Llama 3.1
             response_format={"type": "json_object"}
         )
         
