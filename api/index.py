@@ -45,7 +45,7 @@ async def analyze_batch(input_data: HeadlineBatchInput):
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": formatted_titles}
             ],
-            model="llama3-70b-8192", # Oficjalny, stabilny identyfikator Llama 3.3 na Groq
+            model="llama-3.1-8b-instant", # Oficjalny, stabilny identyfikator Llama 3.3 na Groq
             response_format={"type": "json_object"}
         )
         
