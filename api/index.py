@@ -4,8 +4,7 @@ from typing import List
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from openai import OpenAI
-import httpx
+from groq import Groq
 
 app = FastAPI()
 
@@ -16,28 +15,23 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
+# Pobieramy klucz Groq z Vercela
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
-http_client = httpx.Client(verify=False, trust_env=False)
+# Inicjalizacja oficjalnego klienta Groq
+client = Groq(api_api_key=GROQ_API_KEY) if hasattr(Groq, 'api_api_key') else Groq(api_key=GROQ_API_KEY)
 
-client = OpenAI(
-    base_url="https://models.inference.ai.azure.com",
-    api_key=GITHUB_TOKEN,
-    http_client=http_client
-)
-
-# Model przyjmowania danych – teraz akceptujemy listę napisów
 class HeadlineBatchInput(BaseModel):
     titles: List[str]
 
 @app.get("/")
 def read_root():
-    return {"status": "News Guard API na Vercel dziala!"}
+    return {"status": "News Guard API (Groq) na Vercel dziala!"}
 
 @app.post("/analyze-batch")
 async def analyze_batch(input_data: HeadlineBatchInput):
     try:
-        # Tworzymy numerowaną listę nagłówków dla modelu AI
+        # Numerujemy nagłówki dla modelu
         formatted_titles = "\n".join([f"{idx + 1}. {title}" for idx, title in enumerate(input_data.titles)])
 
         system_prompt = (
@@ -52,7 +46,7 @@ async def analyze_batch(input_data: HeadlineBatchInput):
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": formatted_titles}
             ],
-            model="Meta-Llama-3.1-8B-Instruct", # Nowszy model Llama 3.1
+            model="llama-3.1-8b-instant", # Ultraszybki model na Groq
             response_format={"type": "json_object"}
         )
         
