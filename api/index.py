@@ -15,11 +15,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Pobieramy klucz Groq z Vercela
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-
-# Inicjalizacja oficjalnego klienta Groq
-client = Groq(api_api_key=GROQ_API_KEY) if hasattr(Groq, 'api_api_key') else Groq(api_key=GROQ_API_KEY)
+client = Groq(api_key=GROQ_API_KEY)
 
 class HeadlineBatchInput(BaseModel):
     titles: List[str]
@@ -31,7 +28,6 @@ def read_root():
 @app.post("/analyze-batch")
 async def analyze_batch(input_data: HeadlineBatchInput):
     try:
-        # Numerujemy nagłówki dla modelu
         formatted_titles = "\n".join([f"{idx + 1}. {title}" for idx, title in enumerate(input_data.titles)])
 
         system_prompt = (
@@ -46,7 +42,7 @@ async def analyze_batch(input_data: HeadlineBatchInput):
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": formatted_titles}
             ],
-            model="llama-3.1-8b-instant", # Ultraszybki model na Groq
+            model="llama-3.1-8b-instant",
             response_format={"type": "json_object"}
         )
         
