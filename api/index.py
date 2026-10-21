@@ -24,7 +24,6 @@ def read_root():
 
 @app.post("/analyze-batch")
 async def analyze_batch(input_data: HeadlineBatchInput):
-    # Bezpieczne pobranie klucza wewnątrz funkcji
     groq_api_key = os.getenv("GROQ_API_KEY")
     
     if not groq_api_key:
@@ -46,7 +45,7 @@ async def analyze_batch(input_data: HeadlineBatchInput):
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": formatted_titles}
             ],
-            model="llama-3.1-8b-instant",
+            model="llama-3.3-70b-versatile", # Oficjalny, stabilny identyfikator Llama 3.3 na Groq
             response_format={"type": "json_object"}
         )
         
