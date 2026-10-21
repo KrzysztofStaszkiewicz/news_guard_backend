@@ -15,19 +15,23 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-client = Groq(api_key=GROQ_API_KEY)
-
 class HeadlineBatchInput(BaseModel):
     titles: List[str]
 
 @app.get("/")
 def read_root():
-    return {"status": "News Guard API (Groq) na Vercel dziala!"}
+    return {"status": "News Guard API (Groq) dziala!"}
 
 @app.post("/analyze-batch")
 async def analyze_batch(input_data: HeadlineBatchInput):
+    # Bezpieczne pobranie klucza wewnątrz funkcji
+    groq_api_key = os.getenv("GROQ_API_KEY")
+    
+    if not groq_api_key:
+        raise HTTPException(status_code=500, detail="Błąd: Brak zmiennej GROQ_API_KEY w panelu Vercel!")
+
     try:
+        client = Groq(api_key=groq_api_key)
         formatted_titles = "\n".join([f"{idx + 1}. {title}" for idx, title in enumerate(input_data.titles)])
 
         system_prompt = (
@@ -50,4 +54,4 @@ async def analyze_batch(input_data: HeadlineBatchInput):
         return json.loads(ai_response)
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Błąd wykonania Groq: {str(e)}")
