@@ -1,16 +1,29 @@
 import os
 import json
+import hmac
 from typing import List, Optional
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Header
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from groq import Groq
 
 app = FastAPI()
 
+# Rozszerzenie wywołuje backend z service workera (host_permissions), więc CORS
+# nie jest tu potrzebny. Zostawiam, żeby niczego nie zepsuć; to NIE jest zabezpieczenie.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 MODEL = "openai/gpt-oss-120b"  # jedno miejsce do zmiany modelu
+
 
 class HeadlineBatchInput(BaseModel):
     titles: List[str] = Field(..., min_length=1, max_length=15)
+
 
 SYSTEM_PROMPT = (
     "Jesteś analitykiem mediów. Dla każdego ponumerowanego nagłówka oceń:\n"
@@ -23,18 +36,38 @@ SYSTEM_PROMPT = (
     '{"id": 2, "clickbait": 10, "emotion": 2}]}'
 )
 
+
 def clamp(value, lo, hi) -> Optional[int]:
     try:
         return max(lo, min(hi, int(value)))
     except (TypeError, ValueError):
         return None
 
+
+def sprawdz_sekret(przeslany: Optional[str]) -> None:
+    """Porównuje sekret z nagłówka z APP_SECRET z Vercela (w stałym czasie)."""
+    oczekiwany = os.getenv("APP_SECRET")
+    if not oczekiwany:
+        raise HTTPException(status_code=500, detail="Brak APP_SECRET na serwerze")
+    if not przeslany or not hmac.compare_digest(
+        przeslany.encode("utf-8"), oczekiwany.encode("utf-8")
+    ):
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+
 @app.get("/")
 def read_root():
     return {"status": "News Guard API (Groq) dziala!"}
 
+
 @app.post("/analyze-batch")
-async def analyze_batch(input_data: HeadlineBatchInput):
+async def analyze_batch(
+    input_data: HeadlineBatchInput,
+    x_newsguard_key: Optional[str] = Header(default=None),
+):
+    # 1. Najpierw sekret - bez niego nie dotykamy nawet klucza Groqa
+    sprawdz_sekret(x_newsguard_key)
+
     api_key = os.getenv("GROQ_API_KEY")
     if not api_key:
         raise HTTPException(status_code=500, detail="Brak GROQ_API_KEY")
